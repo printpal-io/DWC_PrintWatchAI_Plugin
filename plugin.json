@@ -2,10 +2,10 @@
   "id": "PrintWatch",
   "name": "PrintWatch AI",
   "author": "printpal.io LLC",
-  "version": "3.4.2-dwc",
+  "version": "3.5.0-dwc",
   "license": "GPL-2.0-only",
   "homepage": "https://printpal.io",
-  "dwcVersion": "3.4",
+  "dwcVersion": "3.5.0-rc",
   "sbcRequired": false,
   "tags": [
     "AI",
