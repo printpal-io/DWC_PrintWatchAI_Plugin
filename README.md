@@ -1,17 +1,27 @@
-# PrintWatch AI Plugin for Duet
+# PrintWatch AI Plugin for DuetWebControl-only
 
 This plugin monitors the webcam stream on any RepRapFirmware printer for spaghetti type defects. It can work with any camera that is accessible via an IP address/HTTP endpoint. 
-It can only be used in SBC mode currently.
+If running Duet in SBC mode, use the [DSF Plugin](https://github.com/printpal-io/DSF_PrintWatchAI_Plugin) instead of this one.
 
 ![alt text](https://forum.duet3d.com/assets/uploads/files/1693886852613-665bd7f4-af57-4130-a03a-eadb9dd80558-image.png)
 ## Installation
 
+The use of the DWC-only version of this Plugin requires two steps:
+
+**1 - DWC UI component:** 
+
 To install this plugin, open DWC, go to `Settings -> Plugins -> External Plugins` and click on "Install Plugin".
+
 Then select the plugin ZIP file and confirm the following steps. 
 
 The plugin ZIP can be found on this GitHub repository's **Releases -> Version X.X.X -> PrintWatch-X.X.X.zip**. 
+Alternatively, click [here](https://github.com/printpal-io/DWC_PrintWatchAI_Plugin/releases) to be taken to the release page.
 
-Alternatively, click [here](https://github.com/printpal-io/DSF_PrintWatchAI_Plugin/releases) to be taken to the release page.
+**2 - AI Backend Component:** 
+
+In order to use this Plugin in DWC-only mode, the AI Backend needs to be running on another device. The AI backend can run on any Linux device (Raspberry Pi, Orange Pi, etc..). 
+
+Follow the instructions on [this repository]() to setup the backend on your secondary device.
 
 ## Usage
 **Getting started with the plugin.**
@@ -49,5 +59,4 @@ Navigate to the **Preview** tab on the PrintWatch AI plugin page to view the AI'
 The **Defectiveness Level** is shown on a circular Gauge to the right of the camera preview. The Guage displays the level on a scale of 0 - 100. A score close to zero indicates that there are no defects detected in the current frame, where a larger value indicates that defects have been detected.
 
 Each printer and configuration will have a different value at which defects are detected well at. Please refer [section 1.3.1 of the Configuration Guide](https://printpal.io/documentation/tuning-your-setup/#articleTOC_3) to properly setup the printer's AI.
-
 
