@@ -1,0 +1,15 @@
+{
+  "id": "PrintWatch",
+  "name": "PrintWatch AI",
+  "author": "printpal.io LLC",
+  "version": "3.4.2-dwc",
+  "license": "GPL-2.0-only",
+  "homepage": "https://printpal.io",
+  "dwcVersion": "3.4",
+  "sbcRequired": false,
+  "tags": [
+    "AI",
+    "monitoring",
+    "printwatch"
+  ]
+}
