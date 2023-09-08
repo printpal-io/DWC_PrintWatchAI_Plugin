@@ -21,19 +21,21 @@ Alternatively, click [here](https://github.com/printpal-io/DWC_PrintWatchAI_Plug
 
 In order to use this Plugin in DWC-only mode, the AI Backend needs to be running on another device. The AI backend can run on any Linux device (Raspberry Pi, Orange Pi, etc..). 
 
-Follow the instructions on [this repository]() to setup the backend on your secondary device.
+Follow the instructions on the [PrintWatchAI Backend repository](https://github.com/printpal-io/PrintWatchAI_Backend) to setup the backend on your secondary device.
 
 ## Usage
 **Getting started with the plugin.**
   1. Go to the plugin tab by navigating the side panel **Plugins -> PrintWatch AI**
   2. Enable the plugin by clicking the **Enable Monitoring** button
   3. In the PrintWatch AI plugin page, navigate to the **Settings** tab.
-  4. Obtain your API key and enter it into the **API key** field. Navigate to the [WebApp](https://app.printpal.io) and create a Free account:
+  4. Obtain the IP address of the device running the [PrintWatchAI Backend](https://github.com/printpal-io/PrintWatchAI_Backend) and input it into the `Backend IP` setting input **First**
+  5. Enter the IP address of the Duet Board into the `Duet board IP` setting. This is the same IP address that you use to access DWC in your browser `e.g. 172.17.18.139`
+  6. Obtain your API key and enter it into the **API key** field. Navigate to the [WebApp](https://app.printpal.io) and create a Free account:
       1. Click 'Sign Up'
       2. Enter desired credentials
       3. Verify account with code sent via email
       4. Log into the WebApp and navigate to **Account -> Settings** and copy the **API key** value. Paste this value into the **API key** field in the Duet plugin
-  6. For the Webcam URL input, enter the HTTP url at which the static image of the IP camera can be found. If using [Motion](https://plugins.duet3d.com/plugins/MotionWebcamServerPlugin.html) to handle the webcam streaming,       this value will be: "http://<ip_address>:<port>/<camera_number>/current". If configured using default settings with the Motion Plugin, this will be:  "http://localhost:8081/0/current"
+  7. For the Webcam URL input, enter the HTTP url at which the static image of the IP camera can be found. If using [Motion](https://plugins.duet3d.com/plugins/MotionWebcamServerPlugin.html) to handle the webcam streaming,       this value will be: "http://<ip_address>:<port>/<camera_number>/current". If configured using default settings with the Motion Plugin, this will be:  "http://localhost:8081/0/current"
 
 
 **Thresholds**
