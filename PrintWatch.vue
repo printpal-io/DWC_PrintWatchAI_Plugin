@@ -220,6 +220,7 @@ export default {
 			trackingInfo : {},
 			intervalId : null,
 			streamIntervalId : null,
+			heartbeatInterval : null,
 			notificationThreshold : null,
 			actionThreshold : null,
 			pausePrint : false,
@@ -299,6 +300,24 @@ export default {
           console.log('There was a problem with the fetch operation:', error);
         });
     },
+		fetchHeartbeat() {
+			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/heartbeat' + new URLSearchParams({
+					api_key: this.apiKey,
+					test_mode: this.testMode,
+					enable_monitor : this.enableMonitoring,
+					duet_ip : this.duet_ip
+				}))
+				.then((response) => response.json())
+				.then((data) => {
+					if (data.status == 8001) {
+						this.setAll();
+						console.log('Synced variables with the backend');
+					}
+				})
+				.catch(error => {
+					console.log('There was a problem with the fetch operation:', error);
+				});
+		}
 		initMonitor() {
       // API call to backend
       fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor_init')
@@ -332,6 +351,28 @@ export default {
         console.log('There was a problem with the fetch operation:', error);
       });
     },
+		setAll(){
+			var ss = {
+				camera_ip : this.snapshotUrl,
+				email_addr : this.emailAddr,
+				notification_threshold : this.notificationThreshold,
+				action_threshold : this.actionThreshold,
+				notify_action : this.enableNotify,
+				pause_action : this.pausePrint
+			};
+			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/set_settings', {
+				method: 'POST',
+				headers: {
+		      'Accept': 'application/json',
+		      'Content-Type': 'application/json'
+	    	},
+	    	body: JSON.stringify(ss),
+			})
+      .then(response => response.json())
+      .catch(error => {
+        console.log('There was a problem with the fetch operation:', error);
+      });
+		},
     checkAndStartInterval() {
       if (this.enableMonitoring && this.backendAddr != '') {
         this.fetchData(); // Initial API call
@@ -351,6 +392,11 @@ export default {
 					this.fetchPreview();
 				}, 5000); // Every 5 seconds
       }
+			if (this.heartbeatInterval != null) {
+				this.heartbeatInterval = setInterval(() => {
+					this.fetchHeartbeat();
+				}, 10000);
+			}
     },
     stopInterval() {
       clearInterval(this.intervalId);
