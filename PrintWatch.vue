@@ -123,19 +123,19 @@ img {
 														</div>
 														<div class="col-md-12 col-12">
 															<v-col cols="12" md="8">
-																<v-text-field v-model="backendAddr" label="Backend IP" hide-details></v-text-field>
+																<v-text-field v-model="backendAddr" label="Backend IP" hide-details></v-text-field><v-icon title="Backend Connected to IP successfully" v-show="backendIPValid">mdi-check-circle</v-icon><v-icon title="Failed to connect to Backend using this IP" v-show="!backendIPValid">mdi-alert</v-icon>
 															</v-col>
 															<v-col cols="12" md="8">
-																<v-text-field v-model="duet_ip" label="Duet board IP" hide-details></v-text-field>
+																<v-text-field v-model="duet_ip" label="Duet board IP" :disabled="!backendIPValid || duetIPFetched" hide-details></v-text-field>
 															</v-col>
 															<v-col cols="12" md="8">
-																<v-text-field v-model="apiKey" label="API key" hide-details></v-text-field>
+																<v-text-field v-model="apiKey" label="API key" :disabled="!backendIPValid" hide-details></v-text-field>
 															</v-col>
 															<v-col cols="12" md="8">
-																<v-text-field v-model="snapshotUrl" label="Webcam URL" hide-details></v-text-field>
+																<v-text-field v-model="snapshotUrl" label="Webcam URL" :disabled="!backendIPValid" hide-details></v-text-field><v-icon title="Valid Webcam URL" v-show="cameraIPValid">mdi-check-circle</v-icon><v-icon title="Invalid Webcam URL" v-show="!cameraIPValid">mdi-alert</v-icon>
 															</v-col>
 															<v-col cols="12" md="8">
-																<v-text-field v-model="emailAddr" label="Email address" hide-details></v-text-field>
+																<v-text-field v-model="emailAddr" label="Email address" :disabled="!backendIPValid" hide-details></v-text-field>
 															</v-col>
 															<div class="pt-8">
 																<div class="text-caption">
@@ -145,6 +145,7 @@ img {
 															    v-model="notificationThreshold"
 															    :max="100"
 															    :min="0"
+																	:disabled="!backendIPValid"
 															    hide-details
 																	thumb-label="always"
 																	class="pt-8"
@@ -160,6 +161,7 @@ img {
 															    v-model="actionThreshold"
 															    :max="100"
 															    :min="0"
+																	:disabled="!backendIPValid"
 															    hide-details
 																	thumb-label="always"
 																	class="pt-8"
@@ -177,10 +179,13 @@ img {
 														</div>
 														<div class="col-md-12 col-12">
 															<v-col cols="12" md="12">
-																<v-switch v-model="enableNotify" label="Enable Email Notification" hide-details></v-switch>
+																<v-switch v-model="enableNotify" label="Enable Email Notification" :disabled="!backendIPValid" hide-details></v-switch>
 															</v-col>
 															<v-col cols="12" md="12">
-																<v-switch v-model="pausePrint" label="Pause Print" hide-details></v-switch>
+																<v-switch v-model="pausePrint" label="Pause Print" :disabled="!backendIPValid" hide-details></v-switch>
+															</v-col>
+															<v-col cols="12" md="8">
+																<v-text-field v-model="pauseGCode" label="Pause G/M-Code command" :disabled="!pausePrint" hide-details></v-text-field>
 															</v-col>
 														</div>
 													</div>
@@ -223,16 +228,23 @@ export default {
 			heartbeatInterval : null,
 			notificationThreshold : null,
 			actionThreshold : null,
-			pausePrint : false,
+			pausePrint : null, //false
 			emailAddr : '',
-			enableNotify : false,
+			enableNotify : null, //false
 			snapshotUrl : '',
 			apiKey : '',
-			testMode : false,
+			testMode : null, //false
 			defectLevel : 0,
 			gaugeColor : 'primary',
 			duet_ip : '',
-			backendAddr : ''
+			backendAddr : '',
+			backendIPValid : false,
+			failedComms : 0,
+			validateIntervalId : undefined,
+			duetIPFetched : false,
+			pauseGCode : '',
+			cameraIPValid : false,
+			validateCamIntervalId : undefined
 		}
 	},
 
@@ -255,123 +267,264 @@ export default {
 		},
 		fetchSettings() {
 			// API call to backend
-			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/get_settings')
-				.then((response) => response.json())
-				.then((data) => {
-					this.notificationThreshold = Math.round(data.settings.thresholds.notification * 100.0);
-					this.actionThreshold = Math.round(data.settings.thresholds.action * 100.0);
-					this.pausePrint = data.settings.actions.pause;
-					this.emailAddr = data.settings.email_addr;
-					this.enableNotify = data.settings.actions.notify;
-					this.snapshotUrl = data.settings.camera_ip;
-					this.apiKey = data.settings.api_key;
-					this.testMode = data.settings.test_mode;
-					this.enableMonitoring = data.settings.monitoring_on;
-					this.duet_ip = data.settings.duet_ip;
-				})
-				.catch(error => {
-					console.log('There was a problem with the fetch operation:', error);
-				});
+			if (this.backendIPValid) {
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/get_settings', {signal : controller.signal})
+					.then((response) => response.json())
+					.then((data) => {
+						clearTimeout(id);
+						this.notificationThreshold = Math.round(data.settings.thresholds.notification * 100.0);
+						this.actionThreshold = Math.round(data.settings.thresholds.action * 100.0);
+						this.pausePrint = data.settings.actions.pause;
+						this.emailAddr = data.settings.email_addr;
+						this.enableNotify = data.settings.actions.notify;
+						this.snapshotUrl = data.settings.camera_ip;
+						this.apiKey = data.settings.api_key;
+						this.testMode = data.settings.test_mode;
+						this.enableMonitoring = data.settings.monitoring_on;
+						this.duet_ip = data.settings.duet_ip;
+						this.pauseGCode = data.settings.pause_gcode;
+					})
+					.catch(error => {
+						clearTimeout(id);
+						console.log('There was a problem with the fetch operation:', error);
+						this.failedComms++;
+					});
+				}
 		},
     fetchData() {
-      // API call to backend
-      fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor')
-        .then((response) => response.json())
-        .then((data) => {
-					if (data.status == 8000) {
-						this.trackingInfo = data.items.status;
-						this.defectLevel = parseInt(parseFloat(data.items.status.buffer.slice(-1)[0][0]) * 100)
-					}
-        })
-        .catch(error => {
-          console.log('There was a problem with the fetch operation:', error);
-        });
+			if (this.backendIPValid) {
+				// API call to backend
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor', {signal : controller.signal})
+					.then((response) => response.json())
+					.then((data) => {
+						clearTimeout(id);
+						if (data.status == 8000) {
+							this.trackingInfo = data.items.status;
+							this.defectLevel = parseInt(parseFloat(data.items.status.buffer.slice(-1)[0][0]) * 100)
+						}
+					})
+					.catch(error => {
+						clearTimeout(id);
+						console.log('There was a problem with the fetch operation:', error);
+						this.failedComms++;
+					});
+			}
     },
 		fetchPreview() {
-      // API call to backend
-      fetch('http://' + this.backendAddr + ':8989/machine/printwatch/preview')
-        .then((response) => response.json())
-        .then((data) => {
-					if (data.status == 8000) {
-						this.imageDetectionPreview = data.items.status.preview;
-					}
-        })
-        .catch(error => {
-          console.log('There was a problem with the fetch operation:', error);
-        });
+			if (this.backendIPValid) {
+				// API call to backend
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/preview', {signal : controller.signal})
+					.then((response) => response.json())
+					.then((data) => {
+						clearTimeout(id);
+						if (data.status == 8000) {
+							this.imageDetectionPreview = data.items.status.preview;
+						}
+					})
+					.catch(error => {
+						clearTimeout(id);
+						console.log('There was a problem with the fetch operation:', error);
+						this.failedComms++;
+					});
+			}
     },
 		fetchHeartbeat() {
-			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/heartbeat' + new URLSearchParams({
-					api_key: this.apiKey,
-					test_mode: this.testMode,
-					enable_monitor : this.enableMonitoring,
-					duet_ip : this.duet_ip
-				}))
+			if (this.backendAddr != '') {
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				let prms_ = new URLSearchParams({
+						api_key: this.apiKey,
+						duet_ip : this.duet_ip
+					});
+				if (this.testMode != null) {
+					prms_.append("test_mode", this.testMode);
+				}
+				if (this.enableMonitoring != null) {
+					prms_.append("enable_monitor", this.enableMonitoring);
+				}
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/heartbeat?' + prms_,
+					{signal : controller.signal})
+					.then((response) => response.json())
+					.then((data) => {
+						clearTimeout(id);
+						if (data.status == 8001) {
+							this.setAll();
+							console.log('Synced variables with the backend');
+						} else if (data.status == 8002) {
+							this.notificationThreshold = Math.round(data.settings.thresholds.notification * 100.0);
+							this.actionThreshold = Math.round(data.settings.thresholds.action * 100.0);
+							this.pausePrint = data.settings.actions.pause;
+							this.emailAddr = data.settings.email_addr;
+							this.enableNotify = data.settings.actions.notify;
+							this.apiKey = data.settings.api_key;
+							this.testMode = data.settings.test_mode;
+							this.pauseGCode = data.settings.pause_gcode;
+						}
+						if (!this.backendIPValid) {
+							this.backendIPValid = true;
+							this.failedComms = 0;
+
+							if (this.intervalId == null) {
+								this.intervalId = setInterval(() => {
+									this.fetchData();
+								}, 5000); // Every 5 seconds
+							}
+
+							if (this.streamIntervalId == null) {
+								this.streamIntervalId = setInterval(() => {
+									this.fetchPreview();
+								}, 5000); // Every 5 seconds
+							}
+						}
+					})
+					.catch(error => {
+						clearTimeout(id);
+						console.log('There was a problem with the fetch operation:', error);
+						this.failedComms++;
+					});
+			}
+		},
+		getActualIP() {
+			const timeout = 5000;
+			const controller = new AbortController();
+			const id = setTimeout(() => controller.abort(), timeout);
+
+			fetch('/rr_model?key=network',
+				{signal : controller.signal})
 				.then((response) => response.json())
 				.then((data) => {
-					if (data.status == 8001) {
-						this.setAll();
-						console.log('Synced variables with the backend');
+					clearTimeout(id);
+					if (data.result.interfaces[0].actualIP.split('.').length == 4) {
+						this.duet_ip = data.result.interfaces[0].actualIP;
+						this.duetIPFetched = true;
+						this.setSettings("duet_ip", this.duet_ip);
+						console.log('Got duet board IP: ' + data.result.interfaces[0].actualIP);
+					} else {
+						this.duetIPFetched = false;
 					}
 				})
 				.catch(error => {
+					clearTimeout(id);
 					console.log('There was a problem with the fetch operation:', error);
+					this.failedComms++;
 				});
-		}
+		},
 		initMonitor() {
-      // API call to backend
-      fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor_init')
-        .then((response) => response.json())
-        .catch(error => {
-          console.log('There was a problem with the fetch operation:', error);
-        });
+			if (this.backendIPValid) {
+				// API call to backend
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor_init', {signal : controller.signal})
+				.then((response) => response.json())
+				.then(() => {
+					clearTimeout(id);
+				})
+				.catch(error => {
+					clearTimeout(id);
+					console.log('There was a problem with the fetch operation:', error);
+					this.failedComms++;
+				});
+			}
     },
 		stopMonitor() {
-      // API call to backend
-      fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor_off')
-        .then((response) => response.json())
-        .catch(error => {
-          console.log('There was a problem with the fetch operation:', error);
-        });
+			if (this.backendIPValid) {
+				// API call to backend
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/monitor_off', {signal : controller.signal})
+				.then((response) => response.json())
+				.then(() => {
+					clearTimeout(id);
+				})
+				.catch(error => {
+					clearTimeout(id);
+					console.log('There was a problem with the fetch operation:', error);
+					this.failedComms++;
+				});
+			}
     },
 		setSettings(keyName, value) {
-      // API call to backend
-			var ss = {};
-			ss[keyName] = value;
-      fetch('http://' + this.backendAddr + ':8989/machine/printwatch/set_settings', {
-				method: 'POST',
-				headers: {
-		      'Accept': 'application/json',
-		      'Content-Type': 'application/json'
-	    	},
-	    	body: JSON.stringify(ss),
-			})
-      .then(response => response.json())
-      .catch(error => {
-        console.log('There was a problem with the fetch operation:', error);
-      });
+			if (this.backendIPValid) {
+				// API call to backend
+				var ss = {};
+				ss[keyName] = value;
+
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/set_settings', {
+					method: 'POST',
+					headers: {
+						'Accept': 'application/json',
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(ss),
+					signal : controller.signal
+				})
+				.then(response => response.json())
+				.then(() => {
+					clearTimeout(id);
+				})
+				.catch(error => {
+					clearTimeout(id);
+					console.log('There was a problem with the fetch operation:', error);
+					this.failedComms++;
+				});
+			}
     },
-		setAll(){
-			var ss = {
-				camera_ip : this.snapshotUrl,
-				email_addr : this.emailAddr,
-				notification_threshold : this.notificationThreshold,
-				action_threshold : this.actionThreshold,
-				notify_action : this.enableNotify,
-				pause_action : this.pausePrint
-			};
-			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/set_settings', {
-				method: 'POST',
-				headers: {
-		      'Accept': 'application/json',
-		      'Content-Type': 'application/json'
-	    	},
-	    	body: JSON.stringify(ss),
-			})
-      .then(response => response.json())
-      .catch(error => {
-        console.log('There was a problem with the fetch operation:', error);
-      });
+		setAll() {
+			if (this.backendIPValid) {
+				var ss = {
+					camera_ip : this.snapshotUrl,
+					email_addr : this.emailAddr,
+					notification_threshold : this.notificationThreshold,
+					action_threshold : this.actionThreshold,
+					notify_action : this.enableNotify,
+					pause_action : this.pausePrint
+				};
+
+				const timeout = 5000;
+				const controller = new AbortController();
+				const id = setTimeout(() => controller.abort(), timeout);
+
+				fetch('http://' + this.backendAddr + ':8989/machine/printwatch/set_settings', {
+					method: 'POST',
+					headers: {
+						'Accept': 'application/json',
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(ss),
+					signal : controller.signal
+				})
+				.then(response => response.json())
+				.then(() => {
+					clearTimeout(id);
+				})
+				.catch(error => {
+					clearTimeout(id);
+					console.log('There was a problem with the fetch operation:', error);
+					this.failedComms++;
+				});
+			}
 		},
     checkAndStartInterval() {
       if (this.enableMonitoring && this.backendAddr != '') {
@@ -392,12 +545,76 @@ export default {
 					this.fetchPreview();
 				}, 5000); // Every 5 seconds
       }
-			if (this.heartbeatInterval != null) {
+			if (this.heartbeatInterval == null) {
 				this.heartbeatInterval = setInterval(() => {
 					this.fetchHeartbeat();
 				}, 10000);
 			}
     },
+		validateBackendIP() {
+			// API call to backend
+			this.backendIPValid = false;
+			if (this.validateIntervalId != null && this.validateIntervalId != undefined) {
+				clearTimeout(this.validateIntervalId);
+			}
+			const timeout = 5000;
+			const controller = new AbortController();
+			this.validateIntervalId = setTimeout(() => controller.abort(), timeout);
+
+			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/get_settings', {signal : controller.signal})
+				.then((response) => response.json())
+				.then((data) => {
+					clearTimeout(this.validateIntervalId);
+					this.backendIPValid = true;
+					console.log('Successfully got the response to validate backendIP: ' + this.backendIPValid + ' ' + this.backendAddr);
+					this.notificationThreshold = Math.round(data.settings.thresholds.notification * 100.0);
+					this.actionThreshold = Math.round(data.settings.thresholds.action * 100.0);
+					this.pausePrint = data.settings.actions.pause;
+					this.emailAddr = data.settings.email_addr;
+					this.enableNotify = data.settings.actions.notify;
+					this.snapshotUrl = data.settings.camera_ip;
+					this.apiKey = data.settings.api_key;
+					this.testMode = data.settings.test_mode;
+					this.enableMonitoring = data.settings.monitoring_on;
+					this.duet_ip = data.settings.duet_ip;
+					this.pauseGCode = data.settings.pause_gcode;
+				})
+
+				.catch(error => {
+					clearTimeout(this.validateIntervalId);
+					console.log('There was a problem with the fetch operation:', error);
+					this.backendIPValid = false;
+				});
+		},
+		validateWebcamUrl() {
+
+			this.cameraIPValid = false;
+			if (this.validateCamIntervalId != null && this.validateCamIntervalId != undefined) {
+				clearTimeout(this.validateCamIntervalId);
+			}
+
+			const timeout = 5000;
+			const controller = new AbortController();
+			this.validateCamIntervalId = setTimeout(() => controller.abort(), timeout);
+
+			console.log('Trying to validate snapshot URL: ' + this.snapshotUrl);
+			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/test_url', {signal : controller.signal})
+				.then((response) => response.json())
+				.then((data) => {
+					clearTimeout(this.validateCamIntervalId);
+					if (data.status == 8000) {
+						this.cameraIPValid = true;
+					} else {
+						this.cameraIPValid = false;
+					}
+
+				})
+				.catch(error => {
+					clearTimeout(this.validateCamIntervalId);
+					console.log('There was a problem with the fetch operation:', error);
+					this.cameraIPValid = false;
+				});
+		},
     stopInterval() {
       clearInterval(this.intervalId);
 			clearInterval(this.streamIntervalId);
@@ -409,6 +626,7 @@ export default {
 
 	mounted() {
 		// Reload the file list
+		this.getActualIP();
 		this.initSettings();
 		this.fetchSettings();
     this.checkAndStartInterval();
@@ -423,46 +641,80 @@ export default {
 			pluginCache: (state) => state.plugins.PrintWatch,
 		}),
 		backendAddr: function() {
+			if (this.backendAddr != null && this.backendAddr.length > 5) {
 				setPluginData('PrintWatch', PluginDataType.machineSetting, 'backendAddr', this.backendAddr);
+				this.validateBackendIP();
+			}
 		},
 		enableMonitoring : function(){
-			if (this.enableMonitoring) {
-				this.initMonitor();
-				this.checkAndStartInterval();
-			} else {
-				this.stopMonitor();
-				this.stopInterval();
+			if (this.enableMonitoring != null) {
+				if (this.enableMonitoring) {
+					this.initMonitor();
+					this.checkAndStartInterval();
+				} else {
+					this.stopMonitor();
+					this.stopInterval();
+				}
 			}
 		},
 		apiKey : function(){
-			this.setSettings("api_key", this.apiKey);
+			if (this.apiKey != '') {
+				this.setSettings("api_key", this.apiKey);
+			}
 		},
 		snapshotUrl : function(){
-			this.setSettings("camera_ip", this.snapshotUrl);
+			if (this.snapshotUrl != '' && this.snapshotUrl.length > 5) {
+				this.setSettings("camera_ip", this.snapshotUrl);
+				this.validateWebcamUrl();
+			}
 		},
 		emailAddr : function(){
-			this.setSettings("email_addr", this.emailAddr);
+			if (this.emailAddr != '' && this.emailAddr.length > 5) {
+				this.setSettings("email_addr", this.emailAddr);
+			}
 		},
 		notificationThreshold : function(){
-			this.setSettings("notification_threshold", this.notificationThreshold);
+			if (this.notificationThreshold != null) {
+				this.setSettings("notification_threshold", this.notificationThreshold);
+			}
 		},
 		actionThreshold : function(){
-			this.setSettings("action_threshold", this.actionThreshold);
+			if (this.actionThreshold != null) {
+				this.setSettings("action_threshold", this.actionThreshold);
+			}
 		},
 		enableNotify : function(){
-			this.setSettings("notify_action", this.enableNotify);
+			if (this.enableNotify != null) {
+				this.setSettings("notify_action", this.enableNotify);
+			}
 		},
 		pausePrint : function(){
-			this.setSettings("pause_action", this.pausePrint);
+			if (this.pausePrint != null) {
+				this.setSettings("pause_action", this.pausePrint);
+			}
 		},
 		defectLevel : function(){
 			this.setGaugeColor();
 		},
 		duet_ip : function(){
-			this.setSettings("duet_ip", this.duet_ip);
+			if (this.duet_ip != '' && this.duet_ip.length > 5) {
+				this.setSettings("duet_ip", this.duet_ip);
+			}
 		},
 		testMode : function(){
-			this.setSettings("test_mode", this.testMode);
+			if (this.testMode != null) {
+				this.setSettings("test_mode", this.testMode);
+			}
+		},
+		pauseGCode : function(){
+			if (this.pauseGCode != '' && this.pauseGCode.length > 1) {
+				this.setSettings("pause_gcode", this.pauseGCode);
+			}
+		},
+		failedComms : function(){
+			if (this.failedComms>20) {
+				this.backendIPValid = false;
+			}
 		}
 	}
 }
