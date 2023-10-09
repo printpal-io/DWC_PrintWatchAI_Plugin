@@ -244,7 +244,9 @@ export default {
 			duetIPFetched : false,
 			pauseGCode : '',
 			cameraIPValid : false,
-			validateCamIntervalId : undefined
+			validateCamIntervalId : undefined,
+			backendController : undefined,
+			webcamController : undefined
 		}
 	},
 
@@ -553,15 +555,15 @@ export default {
     },
 		validateBackendIP() {
 			// API call to backend
-			this.backendIPValid = false;
 			if (this.validateIntervalId != null && this.validateIntervalId != undefined) {
 				clearTimeout(this.validateIntervalId);
+				this.backendController.abort();
 			}
 			const timeout = 5000;
-			const controller = new AbortController();
-			this.validateIntervalId = setTimeout(() => controller.abort(), timeout);
+			this.backendController = new AbortController();
+			this.validateIntervalId = setTimeout(() => this.backendController.abort(), timeout);
 
-			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/get_settings', {signal : controller.signal})
+			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/get_settings', {signal : this.backendController.signal})
 				.then((response) => response.json())
 				.then((data) => {
 					clearTimeout(this.validateIntervalId);
@@ -591,14 +593,15 @@ export default {
 			this.cameraIPValid = false;
 			if (this.validateCamIntervalId != null && this.validateCamIntervalId != undefined) {
 				clearTimeout(this.validateCamIntervalId);
+				this.webcamController.abort();
 			}
 
 			const timeout = 5000;
-			const controller = new AbortController();
-			this.validateCamIntervalId = setTimeout(() => controller.abort(), timeout);
+			this.webcamController = new AbortController();
+			this.validateCamIntervalId = setTimeout(() => this.webcamController.abort(), timeout);
 
 			console.log('Trying to validate snapshot URL: ' + this.snapshotUrl);
-			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/test_url', {signal : controller.signal})
+			fetch('http://' + this.backendAddr + ':8989/machine/printwatch/test_url', {signal : this.webcamController.signal})
 				.then((response) => response.json())
 				.then((data) => {
 					clearTimeout(this.validateCamIntervalId);
@@ -641,7 +644,7 @@ export default {
 			pluginCache: (state) => state.plugins.PrintWatch,
 		}),
 		backendAddr: function() {
-			if (this.backendAddr != null && this.backendAddr.length > 5) {
+			if (this.backendAddr != null && this.backendAddr.length > 5 && this.backendAddr.split('.').length == 4) {
 				setPluginData('PrintWatch', PluginDataType.machineSetting, 'backendAddr', this.backendAddr);
 				this.validateBackendIP();
 			}
